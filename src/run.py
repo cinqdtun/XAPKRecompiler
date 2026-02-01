@@ -4,12 +4,14 @@ import sys
 import json
 import shutil
 import zipfile
+import argparse 
 import tempfile
 import subprocess
 
 NETWORK_CONFIG_PATH = "./configs/network_security_config.xml"
 APKTOOL_JAR = "./apktool.jar"
 SIGNER_JAR = "./jarsigner.jar"
+ADB_PATH = "./platform-tools/adb"
 BASE_APK_NOT_FOUND_STR = "Error: Base APK not found"
 CMD_FAILED_STR = "Error: running command:"
 
@@ -28,11 +30,15 @@ def run(cmd):
 		errorExit()
 
 def main():
-	if len(sys.argv) < 2:
-		print(f"Usage: python3 {sys.argv[0]} <file.xapk>", file=sys.stderr)
-		sys.exit(1)
+	parser = argparse.ArgumentParser(description='Recompile XAPK with optional patches')
+	parser.add_argument('input_xapk', help='Input XAPK file')
+	parser.add_argument('--network-fix', action='store_true', help='Apply network security config patch')
+	parser.add_argument('--extract-native-libs', action='store_true', help='Set extractNativeLibs to true')
+	parser.add_argument('--pause', action='store_true', help='Pause after applying patches for manual patches before rebuilding')
+	parser.add_argument('--install', action='store_true', help='Install patched APKs to connected ADB device after packaging')
 
-	input_xapk = sys.argv[1]
+	args = parser.parse_args()
+	input_xapk = args.input_xapk
 	temp_dir = tempfile.TemporaryDirectory()
 
 	# need to rework this
@@ -58,7 +64,8 @@ def main():
 			with open(manifest_path, 'r') as f:
 				data = json.load(f)
 				for item in data.get('split_apks', []):
-					if item.get('id') == 'base':
+					apk_id = item.get('id')
+					if apk_id == 'base':
 						base_apk = item.get('file')
 						break
 		except:
@@ -80,32 +87,34 @@ def main():
 	res_xml_path = os.path.join(base_decomp_dir, "res", "xml")
 	os.makedirs(res_xml_path, exist_ok=True) # creating DIR if does not exist
 
-	shutil.copy(NETWORK_CONFIG_PATH, os.path.join(res_xml_path, "network_security_config.xml")) # Copy network config
-
 	android_manifest_path = os.path.join(base_decomp_dir, "AndroidManifest.xml")
 	with open(android_manifest_path, 'r') as f:
 		content = f.read() # Read android manifest
 
 	# Patch 1: Adding network config location if does not exist
-	if "android:networkSecurityConfig" not in content:
-		if "<application" in content:
-			content = content.replace("<application", '<application android:networkSecurityConfig="@xml/network_security_config"', 1)
-			print(" Patch: Added Network Security Config to manifest")
+	if args.network_fix:
+		shutil.copy(NETWORK_CONFIG_PATH, os.path.join(res_xml_path, "network_security_config.xml")) # Copy network config
+		if "android:networkSecurityConfig" not in content:
+			if "<application" in content:
+				content = content.replace("<application", '<application android:networkSecurityConfig="@xml/network_security_config"', 1)
+				print(" Patch: Added Network Security Config to manifest")
 	
 	# Patch 2: Patching extractNativeLibs to true
-	if "android:extractNativeLibs" in content:
-		content = re.sub(r'android:extractNativeLibs="[^"]*"', 'android:extractNativeLibs="true"', content)
-		print(" Patch: Patched extractNativeLibs to true")
-	else:
-		if "<application" in content:
-			content = content.replace("<application", '<application android:extractNativeLibs="true"', 1)
-			print(" Patch: Added extractNativeLibs to manifest")
+	if args.extract_native_libs:
+		if "android:extractNativeLibs" in content:
+			content = re.sub(r'android:extractNativeLibs="[^"]*"', 'android:extractNativeLibs="true"', content)
+			print(" Patch: Patched extractNativeLibs to true")
+		else:
+			if "<application" in content:
+				content = content.replace("<application", '<application android:extractNativeLibs="true"', 1)
+				print(" Patch: Added extractNativeLibs to manifest")
 
 	with open(android_manifest_path, 'w') as f:
 		f.write(content)
 	
-	print(f"Temporary folder path: {temp_dir.name}")
-	input("Patch has been applied press any key to continue...")
+	if args.pause:
+		print(f" Temporary folder path: {temp_dir.name}")
+		input(" Patch has been applied press any key to continue...")
 	
 	# 5. Recompiling Base APK
 	print("--- 5. Recompiling Base APK ---")
@@ -121,7 +130,11 @@ def main():
 			run(["zipalign", "-p", "-f", "4", apk_path, aligned_apk_path])
 			shutil.move(aligned_apk_path, apk_path)
 
-	run(["java", "-jar", SIGNER_JAR, "--apks", temp_dir.name, "--overwrite", "--skipZipAlign"])
+	run(["java", "-jar", SIGNER_JAR, "--apks", temp_dir.name, "--overwrite", "--skipZipAlign", "--allowResign"])
+	
+	for filename in os.listdir(temp_dir.name):
+		if filename.endswith(".idsig"):
+			os.remove(os.path.join(temp_dir.name, filename))
 
 	# 7. Packaging
 	output_xapk = input_xapk.replace(".xapk", "_patched.xapk")
@@ -133,8 +146,17 @@ def main():
 				file_path = os.path.join(root, file)
 				z.write(file_path, os.path.relpath(file_path, temp_dir.name))
 
-	shutil.rmtree(temp_dir.name)
 	print(f"Success! Output file at: {output_xapk}")
+	# 8. Install
+	apk_files = [os.path.join(temp_dir.name, f) for f in os.listdir(temp_dir.name) if f.endswith('.apk')]
+
+	if (apk_files and args.install):
+		print(f"--- 8. Installing patched APKs ---")
+		run([ADB_PATH, "install-multiple"] + apk_files)
+		print(" Installation complete.")
+
+	shutil.rmtree(temp_dir.name)
+	
 	
 if __name__ == "__main__":
 	try:

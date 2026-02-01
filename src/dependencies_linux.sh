@@ -4,8 +4,11 @@ APKTOOL_VERSION="2.9.3"
 JARSIGNER_VERSION="1.3.0"
 APKTOOL_URL="https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_$APKTOOL_VERSION.jar"
 JARSIGNER_URL="https://github.com/patrickfav/uber-apk-signer/releases/download/v$JARSIGNER_VERSION/uber-apk-signer-$JARSIGNER_VERSION.jar"
+PLATFORM_TOOLS_URL="https://dl.google.com/android/repository/platform-tools-latest-linux.zip"
 APKTOOL_PATH="./apktool.jar"
 JARSIGNER_PATH="./jarsigner.jar"
+PLATFORM_TOOLS_PATH="./platform-tools.zip"
+ADB_PATH="./platform-tools/adb"
 
 if [ ! -f "$APKTOOL_PATH" ]; then
 	echo "Downloading apktool $APKTOOL_VERSION..."
@@ -33,4 +36,19 @@ if [ ! -f "$JARSIGNER_PATH" ]; then
 	fi
 else
 	echo "Error: jarsigner.jar already exists at $JARSIGNER_PATH"
+fi
+
+if [ ! -f "$ADB_PATH" ]; then
+	echo "Downloading latest ADB..."
+	curl -L -o "$PLATFORM_TOOLS_PATH" "$PLATFORM_TOOLS_URL"
+	if [ $? -eq 0 ]; then
+		unzip -q "$PLATFORM_TOOLS_PATH"
+		rm -rf $PLATFORM_TOOLS_PATH
+		echo "Download complete: $ADB_PATH"
+	else
+		echo "Download failed."
+		exit 1
+	fi
+else
+	echo "Error: ADB already exists at $ADB_PATH"
 fi
