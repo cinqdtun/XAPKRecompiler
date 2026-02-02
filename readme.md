@@ -26,7 +26,7 @@ Python tool to decompile, patch, and recompile XAPK files. Designed for security
 ## Usage
 
 ```bash
-python main.py <input_xapk> [options]
+python run.py <input_xapk> [options]
 ```
 
 ### Arguments
@@ -44,13 +44,13 @@ python main.py <input_xapk> [options]
 **Basic patch:**
 
 ```bash
-python main.py game.xapk --network-fix
+python run.py game.xapk --network-fix
 ```
 
 **Patch, fix libs, and install to device:**
 
 ```bash
-python main.py app.xapk --network-fix --extract-native-libs --install
+python run.py app.xapk --network-fix --extract-native-libs --install
 ```
 
 ## Cleanup
