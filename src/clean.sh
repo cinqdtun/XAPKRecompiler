@@ -1,7 +1,5 @@
 # Clear dependencies
-rm -rf apktool.jar
-rm -rf jarsigner.jar
-rm -rf platform-tools
+rm -rf dependencies
 
 # Clear XAPK and APK files
 rm -rf *.xapk

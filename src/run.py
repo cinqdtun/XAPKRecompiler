@@ -9,9 +9,10 @@ import tempfile
 import subprocess
 
 NETWORK_CONFIG_PATH = "./configs/network_security_config.xml"
-APKTOOL_JAR = "./apktool.jar"
-SIGNER_JAR = "./jarsigner.jar"
-ADB_PATH = "./platform-tools/adb"
+APKTOOL_JAR = "./dependencies/apktool.jar"
+SIGNER_JAR = "./dependencies/jarsigner.jar"
+ADB_PATH = "./dependencies/android_SDK/platform-tools/adb"
+ZIPALIGN_PATH = "./dependencies/android_SDK/build-tools/36.1.0-rc1/zipalign"
 BASE_APK_NOT_FOUND_STR = "Error: Base APK not found"
 CMD_FAILED_STR = "Error: running command:"
 
@@ -44,9 +45,6 @@ def main():
 	# need to rework this
 	if not shutil.which("java"):
 		print("Error: Java not found.", file=sys.stderr)
-		errorExit()
-	if not shutil.which("zipalign"): 
-		print("Error: zipalign not found.", file=sys.stderr)
 		errorExit()
 	
 	# 1. Extracting XAPK
@@ -127,7 +125,7 @@ def main():
 		if filename.endswith(".apk"):
 			apk_path = os.path.join(temp_dir.name, filename)
 			aligned_apk_path = apk_path + ".aligned"
-			run(["zipalign", "-p", "-f", "4", apk_path, aligned_apk_path])
+			run([ZIPALIGN_PATH, "-p", "-f", "4", apk_path, aligned_apk_path])
 			shutil.move(aligned_apk_path, apk_path)
 
 	run(["java", "-jar", SIGNER_JAR, "--apks", temp_dir.name, "--overwrite", "--skipZipAlign", "--allowResign"])

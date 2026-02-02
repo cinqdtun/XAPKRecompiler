@@ -4,11 +4,15 @@ APKTOOL_VERSION="2.9.3"
 JARSIGNER_VERSION="1.3.0"
 APKTOOL_URL="https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_$APKTOOL_VERSION.jar"
 JARSIGNER_URL="https://github.com/patrickfav/uber-apk-signer/releases/download/v$JARSIGNER_VERSION/uber-apk-signer-$JARSIGNER_VERSION.jar"
-PLATFORM_TOOLS_URL="https://dl.google.com/android/repository/platform-tools-latest-linux.zip"
+CMD_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip"
 APKTOOL_PATH="./apktool.jar"
 JARSIGNER_PATH="./jarsigner.jar"
-PLATFORM_TOOLS_PATH="./platform-tools.zip"
-ADB_PATH="./platform-tools/adb"
+ANDROID_SDK_PATH="./android_SDK"
+CMD_TOOLS_PATH="./cmd-tools.zip"
+SDK_MANAGER_PATH="$ANDROID_SDK_PATH/cmdline-tools/latest/bin/sdkmanager"
+
+mkdir dependencies
+cd dependencies
 
 if [ ! -f "$APKTOOL_PATH" ]; then
 	echo "Downloading apktool $APKTOOL_VERSION..."
@@ -38,17 +42,22 @@ else
 	echo "Error: jarsigner.jar already exists at $JARSIGNER_PATH"
 fi
 
-if [ ! -f "$ADB_PATH" ]; then
-	echo "Downloading latest ADB..."
-	curl -L -o "$PLATFORM_TOOLS_PATH" "$PLATFORM_TOOLS_URL"
+if [ ! -f $ANDROID_SDK_PATH ]; then
+	echo "Downloading latest Android SDK..."
+	curl -L -o "$CMD_TOOLS_PATH" "$CMD_TOOLS_URL"
 	if [ $? -eq 0 ]; then
-		unzip -q "$PLATFORM_TOOLS_PATH"
-		rm -rf $PLATFORM_TOOLS_PATH
-		echo "Download complete: $ADB_PATH"
+		mkdir -p "$ANDROID_SDK_PATH/cmdline-tools/latest"
+		unzip -q "$CMD_TOOLS_PATH" -d "."
+		rm -rf $CMD_TOOLS_PATH
+		mv ./cmdline-tools/* "$ANDROID_SDK_PATH/cmdline-tools/latest"
+		rm -rf cmdline-tools
+		yes | $SDK_MANAGER_PATH --sdk_root=$ANDROID_SDK_PATH "build-tools;36.1.0-rc1"
+		yes | $SDK_MANAGER_PATH --sdk_root=$ANDROID_SDK_PATH "platform-tools"
+		echo "Download complete: $ANDROID_SDK_PATH"
 	else
 		echo "Download failed."
 		exit 1
 	fi
 else
-	echo "Error: ADB already exists at $ADB_PATH"
+	echo "Error: Android SDK already exists at $ANDROID_SDK_PATH"
 fi
